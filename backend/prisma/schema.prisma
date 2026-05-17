@@ -1,0 +1,76 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String      @id @default(uuid()) @db.Uuid
+  email      String      @unique
+  password   String
+  role       String      @default("user") // user | analyst | admin
+  createdAt  DateTime    @default(now()) @map("created_at")
+  urlScans   UrlScan[]
+  emailScans EmailScan[]
+
+  @@map("users")
+}
+
+model UrlScan {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  url            String   @db.Text
+  riskScore      Float?   @map("risk_score")
+  confidence     Float?
+  isPhishing     Boolean? @map("is_phishing")
+  threatCategory String?  @map("threat_category") @db.VarChar(100)
+  features       Json?    @db.JsonB
+  explanations   Json?    @db.JsonB
+  vtResult       Json?    @map("vt_result") @db.JsonB
+  gsbResult      Json?    @map("gsb_result") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("url_scans")
+}
+
+model EmailScan {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  subject     String?  @db.Text
+  body        String?  @db.Text
+  sender      String?  @db.VarChar(255)
+  riskScore   Float?   @map("risk_score")
+  flags       Json?    @db.JsonB
+  nlpAnalysis Json?    @map("nlp_analysis") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_scans")
+}
+
+model ThreatEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventType String   @map("event_type") @db.VarChar(100)
+  severity  String   @db.VarChar(50)
+  domain    String?  @db.Text
+  payload   Json?    @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("threat_events")
+}
+
+model MaliciousDomain {
+  id         String   @id @default(uuid()) @db.Uuid
+  domain     String   @unique @db.Text
+  source     String?  @db.VarChar(100)
+  threatType String?  @map("threat_type") @db.VarChar(100)
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  @@map("malicious_domains")
+}

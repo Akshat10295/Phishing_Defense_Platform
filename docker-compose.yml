@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentinelai-postgres
+    environment:
+      POSTGRES_DB: sentinelai
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sentinelpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - sentinel-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentinelai-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - sentinel-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinelai-backend
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - DATABASE_URL=postgresql://sentinel:${DB_PASSWORD:-sentinelpass}@postgres:5432/sentinelai?schema=public
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      - JWT_SECRET=${JWT_SECRET:-jwtsecret12345}
+      - NODE_ENV=development
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sentinel-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sentinelai-frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - backend
+    networks:
+      - sentinel-net
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: sentinelai-ml
+    volumes:
+      - ./ml-service:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - FLASK_ENV=development
+    networks:
+      - sentinel-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  sentinel-net:
+    driver: bridge

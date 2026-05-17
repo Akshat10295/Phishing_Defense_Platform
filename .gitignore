@@ -1,0 +1,48 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.docusaurus/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Databases and Prisma
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.sqlite
+
+# IDE and Editor configs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Logs and runtime metadata
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
