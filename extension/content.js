@@ -119,7 +119,13 @@ const injectBlockOverlay = (riskScore) => {
 
   // Wire up button interaction listeners
   document.getElementById('sentinel-go-back').addEventListener('click', () => {
-    window.location.href = 'http://localhost';
+    if (document.referrer) {
+      window.location.href = document.referrer;
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = 'http://localhost';
+    }
   });
 
   document.getElementById('sentinel-bypass').addEventListener('click', () => {
