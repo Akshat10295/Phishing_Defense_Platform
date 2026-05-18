@@ -5,10 +5,11 @@
 
 // 1. Analyst JWT Token Synchronization Pipeline
 const syncAnalystToken = () => {
-  if (window.location.host === 'localhost:5173' || window.location.host === '127.0.0.1:5173') {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocal) {
     const token = localStorage.getItem('sentinel_access') || localStorage.getItem('token');
     if (token) {
-      console.log('[content] Sycing active analyst JWT session token to extension runtime...');
+      console.log('[content] Syncing active analyst JWT session token to extension runtime...');
       chrome.runtime.sendMessage({ type: 'SYNC_TOKEN', token });
     }
   }
@@ -118,7 +119,7 @@ const injectBlockOverlay = (riskScore) => {
 
   // Wire up button interaction listeners
   document.getElementById('sentinel-go-back').addEventListener('click', () => {
-    window.location.href = 'http://localhost:5173';
+    window.location.href = 'http://localhost';
   });
 
   document.getElementById('sentinel-bypass').addEventListener('click', () => {

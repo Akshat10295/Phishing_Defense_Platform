@@ -18,8 +18,8 @@ const isSystemUrl = (url) => {
     lower.startsWith('chrome-extension://') ||
     lower.startsWith('about:') ||
     lower.startsWith('view-source:') ||
-    lower.startsWith('localhost:5173') || // Dashboard page
-    lower.startsWith('http://localhost:5173')
+    lower.includes('localhost') || // Whitelist localhost with any port (80, 5000, 5173, etc.)
+    lower.includes('127.0.0.1')    // Whitelist 127.0.0.1 with any port
   );
 };
 
