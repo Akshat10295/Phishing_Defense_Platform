@@ -35,6 +35,27 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   triggerUrlAudit(details.tabId, url);
 });
 
+// Poll a pending scan until it finishes (riskScore is not null)
+const pollScanDetails = async (token, scanId, maxRetries = 10) => {
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch(`${GATEWAY_URL}/scan/url/${scanId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.scan && data.scan.riskScore !== null) {
+          return data.scan;
+        }
+      }
+    } catch (e) {
+      console.warn(`[background] Polling scan detail error on try ${i}:`, e.message);
+    }
+  }
+  return null;
+};
+
 // Trigger scan audits via backend REST
 const triggerUrlAudit = async (tabId, url) => {
   // Check memory cache first
@@ -72,21 +93,36 @@ const triggerUrlAudit = async (tabId, url) => {
     }
 
     const data = await response.json();
-    if (data.success && data.scan) {
-      const riskScore = data.scan.riskScore || 0;
-      const isPhishing = data.scan.isPhishing || false;
+    if (data.success) {
+      let scanResult = null;
 
-      // Cache the result
-      auditedUrlsCache.set(url, { isPhishing, riskScore });
+      // Handle async queue scheduling responses (status: 'pending')
+      if (data.status === 'pending' || !data.scan || data.scan.riskScore === null) {
+        const scanId = data.scanId || data.scan?.id;
+        if (scanId) {
+          console.log(`[background] Scan is pending. Polling Bull Queue details for ID: ${scanId}...`);
+          scanResult = await pollScanDetails(token, scanId);
+        }
+      } else {
+        scanResult = data.scan;
+      }
 
-      if (isPhishing) {
-        console.warn(`[background] Alert: Phishing domain blocked! Score: ${riskScore}`);
-        
-        // Save to persisted blocked list
-        blockedUrls[url] = riskScore;
-        await chrome.storage.local.set({ blockedUrls });
+      if (scanResult) {
+        const riskScore = scanResult.riskScore || 0;
+        const isPhishing = scanResult.isPhishing || false;
 
-        triggerBlockOverlay(tabId, url, riskScore);
+        // Cache the result
+        auditedUrlsCache.set(url, { isPhishing, riskScore });
+
+        if (isPhishing) {
+          console.warn(`[background] Alert: Phishing domain blocked! Score: ${riskScore}`);
+          
+          // Save to persisted blocked list
+          blockedUrls[url] = riskScore;
+          await chrome.storage.local.set({ blockedUrls });
+
+          triggerBlockOverlay(tabId, url, riskScore);
+        }
       }
     }
   } catch (err) {
@@ -137,7 +173,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           body: JSON.stringify({ url })
         });
         const data = await response.json();
-        sendResponse({ success: data.success, scan: data.scan });
+        if (data.success) {
+          let scanResult = null;
+          if (data.status === 'pending' || !data.scan || data.scan.riskScore === null) {
+            const scanId = data.scanId || data.scan?.id;
+            if (scanId) {
+              console.log(`[background] Manual scan is pending. Polling Bull Queue for ID: ${scanId}...`);
+              scanResult = await pollScanDetails(store.token, scanId);
+            }
+          } else {
+            scanResult = data.scan;
+          }
+          sendResponse({ success: true, scan: scanResult });
+        } else {
+          sendResponse({ success: false, error: data.error || 'Failed to start threat scan.' });
+        }
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
