@@ -8,8 +8,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Harden security: create non-root user and restrict privileges
+RUN groupadd -r sentinel && \
+    useradd -r -g sentinel -s /sbin/false sentinel && \
+    chown -R sentinel:sentinel /app
+
+USER sentinel
+
 EXPOSE 8000
 
-ENV FLASK_APP=app/main.py
-
-CMD ["python", "app/main.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "app.main:app"]

@@ -12,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinelai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - sentinel-net
 
@@ -23,6 +28,11 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - sentinel-net
 
@@ -31,9 +41,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sentinelai-backend
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     ports:
       - "5000:5000"
     environment:
@@ -41,10 +48,12 @@ services:
       - DATABASE_URL=postgresql://sentinel:${DB_PASSWORD:-sentinelpass}@postgres:5432/sentinelai?schema=public
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass}@redis:6379
       - JWT_SECRET=${JWT_SECRET:-jwtsecret12345}
-      - NODE_ENV=development
+      - NODE_ENV=production
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - sentinel-net
 
@@ -53,13 +62,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: sentinelai-frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     ports:
-      - "3000:3000"
-    environment:
-      - VITE_API_URL=http://localhost:5000/api/v1
+      - "80:80"
     depends_on:
       - backend
     networks:
@@ -70,13 +74,11 @@ services:
       context: ./ml-service
       dockerfile: Dockerfile
     container_name: sentinelai-ml
-    volumes:
-      - ./ml-service:/app
     ports:
       - "8000:8000"
     environment:
       - PORT=8000
-      - FLASK_ENV=development
+      - FLASK_ENV=production
     networks:
       - sentinel-net
 

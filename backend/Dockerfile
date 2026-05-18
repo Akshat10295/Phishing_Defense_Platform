@@ -1,15 +1,41 @@
-FROM node:18-alpine
+# ==========================================
+# Stage 1: Install packages and Prisma Client
+# ==========================================
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
+COPY prisma ./prisma/
 
-RUN npm install
-
-COPY . .
+RUN npm ci
 
 RUN npx prisma generate
 
+# ==========================================
+# Stage 2: Hardened Runtime Container
+# ==========================================
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install standard production dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy generated Prisma binaries & app code
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY prisma ./prisma/
+COPY src ./src/
+COPY entrypoint.sh ./entrypoint.sh
+
+# Harden filesystem permissions and switch to unprivileged user
+RUN chmod +x ./entrypoint.sh && \
+    chown -R node:node /app
+
+USER node
+
 EXPOSE 5000
 
-CMD ["npm", "run", "dev"]
+ENTRYPOINT ["sh", "./entrypoint.sh"]
