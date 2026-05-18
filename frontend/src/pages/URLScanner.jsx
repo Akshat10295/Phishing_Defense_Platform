@@ -17,31 +17,28 @@ const URLScanner = () => {
     setResult(null);
 
     try {
-      // Temporary status request check to verify backend connectivity
-      const response = await api.get('/status');
+      const response = await api.post('/scan/url', { url });
       
-      // Let's create a beautiful mock scan outcome mapping our architectural explainability JSON outputs
-      setTimeout(() => {
+      if (response.data && response.data.success) {
+        const scanData = response.data.scan;
         setResult({
-          url: url,
-          risk_score: url.includes('paypal') || url.includes('secure') ? 0.89 : 0.12,
-          confidence: 0.94,
-          threat_category: url.includes('paypal') || url.includes('secure') ? 'Credential Harvesting' : 'Safe / Trusted Brand',
-          explanations: url.includes('paypal') || url.includes('secure') ? [
-            { factor: "suspicious_domain_age", impact: 0.28, description: "Domain registered less than 7 days ago." },
-            { factor: "fake_login_form_detected", impact: 0.22, description: "Presence of password input forms targeted externally." },
-            { factor: "ssl_mismatch", impact: 0.18, description: "SSL certificate domain mismatch error." },
-            { factor: "lookalike_domain", impact: 0.21, description: "Levenshtein distance close to legitimate PayPal domain." }
-          ] : [
-            { factor: "domain_reputation", impact: -0.4, description: "High Alexa rank and verified legacy domain." }
-          ]
+          url: scanData.url,
+          risk_score: scanData.riskScore,
+          confidence: scanData.confidence,
+          threat_category: scanData.threatCategory,
+          explanations: scanData.explanations.map(item => ({
+            factor: item.factor,
+            impact: item.impact,
+            description: item.label
+          }))
         });
-        setLoading(false);
-      }, 1500);
-
+      } else {
+        setError('Scanning failed to yield a security assessment.');
+      }
     } catch (err) {
       console.error('Scan error:', err.message);
-      setError('Connection to security gateway failed.');
+      setError(err.response?.data?.error || 'Connection to security gateway failed.');
+    } finally {
       setLoading(false);
     }
   };
