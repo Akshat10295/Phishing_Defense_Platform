@@ -67,7 +67,7 @@ const injectBlockOverlay = (riskScore) => {
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background-color: #0b0f19 !important;
+    background-color: #020617 !important;
     z-index: 2147483647 !important;
     font-family: 'Courier New', Courier, monospace !important;
     display: flex !important;
@@ -82,13 +82,13 @@ const injectBlockOverlay = (riskScore) => {
   container.style.cssText = `
     max-width: 600px !important;
     width: 100% !important;
-    background-color: rgba(17, 24, 39, 0.8) !important;
-    border: 1px solid #dc2626 !important;
+    background-color: #090d16 !important;
+    border: 2px solid #ef4444 !important;
     border-radius: 16px !important;
     padding: 40px !important;
-    box-shadow: 0 0 35px rgba(220, 38, 38, 0.25) !important;
+    box-shadow: 0 0 60px rgba(239, 68, 68, 0.45) !important;
     text-align: center !important;
-    backdrop-filter: blur(12px) !important;
+    backdrop-filter: blur(16px) !important;
     box-sizing: border-box !important;
   `;
 
@@ -96,21 +96,21 @@ const injectBlockOverlay = (riskScore) => {
   const percentage = (riskScore * 100).toFixed(0);
 
   container.innerHTML = `
-    <div style="width: 70px; height: 70px; border-radius: 50%; border: 2px dashed #dc2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; color: #dc2626; font-size: 32px; font-weight: bold;">⚠</div>
+    <div style="width: 70px; height: 70px; border-radius: 50%; border: 2px dashed #ef4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; color: #ef4444; font-size: 32px; font-weight: bold;">⚠</div>
     <h1 style="font-size: 24px; font-weight: 900; color: #f3f4f6; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: -0.5px;">MALICIOUS PORTAL BLOCKED</h1>
     <p style="font-size: 13px; color: #9ca3af; margin: 0 0 24px 0; line-height: 1.6;">
       SentinelAI deep learning models have intercepted this page load. Visual structure analysis indicates signature brand spoofing clone vectors.
     </p>
     
-    <div style="background-color: #0b0f19; border: 1px solid #1f2937; padding: 16px; border-radius: 8px; margin-bottom: 30px; font-size: 11px; text-align: left; line-height: 1.5;">
-      <div style="margin-bottom: 6px;"><strong style="color: #9ca3af;">Audited Link:</strong> <span style="color: #dc2626; word-break: break-all;">${window.location.href}</span></div>
-      <div style="margin-bottom: 6px;"><strong style="color: #9ca3af;">AI Risk Factor:</strong> <span style="color: #dc2626; font-weight: bold;">${percentage}% Phishing Probability</span></div>
-      <div><strong style="color: #9ca3af;">Core Core engines:</strong> <span style="color: #10b981;">PyTorch Siamese CNN + XGBoost</span></div>
+    <div style="background-color: #020617; border: 1px solid #1e293b; padding: 16px; border-radius: 8px; margin-bottom: 30px; font-size: 11px; text-align: left; line-height: 1.5;">
+      <div style="margin-bottom: 6px;"><strong style="color: #9ca3af;">Audited Link:</strong> <span style="color: #ef4444; word-break: break-all;">${window.location.href}</span></div>
+      <div style="margin-bottom: 6px;"><strong style="color: #9ca3af;">AI Risk Factor:</strong> <span style="color: #ef4444; font-weight: bold;">${percentage}% Phishing Probability</span></div>
+      <div><strong style="color: #9ca3af;">Core engines:</strong> <span style="color: #10b981;">PyTorch Siamese CNN + XGBoost</span></div>
     </div>
     
     <div style="display: flex; gap: 16px; justify-content: center;">
-      <button id="sentinel-go-back" style="background-color: #dc2626; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; font-family: monospace; transition: all 0.2s;">RETURN TO SAFETY</button>
-      <button id="sentinel-bypass" style="background-color: transparent; color: #6b7280; border: 1px solid #374151; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 11px; font-family: monospace; transition: all 0.2s;">PROCEED ANYWAY</button>
+      <button id="sentinel-go-back" style="background-color: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; font-family: monospace; transition: all 0.2s; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);">RETURN TO SAFETY</button>
+      <button id="sentinel-bypass" style="background-color: transparent; color: #9ca3af; border: 1px solid #334155; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 11px; font-family: monospace; transition: all 0.2s;">PROCEED ANYWAY</button>
     </div>
   `;
 
