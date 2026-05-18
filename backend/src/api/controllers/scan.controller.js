@@ -5,9 +5,10 @@
 
 const prisma = require('../../config/db');
 const urlAnalyzer = require('../../services/urlAnalyzer.service');
+const { addScanJob } = require('../../services/queue.service');
 
 /**
- * Trigger dynamic hybrid URL inspection
+ * Trigger dynamic hybrid URL inspection (Asynchronous Bull Queue)
  * POST /api/v1/scan/url
  */
 const scanUrl = async (req, res, next) => {
@@ -21,20 +22,78 @@ const scanUrl = async (req, res, next) => {
       });
     }
 
-    // Pass the user ID if the user is authenticated, else run anonymously
-    const userId = req.user ? req.user.id : null;
-    
-    const result = await urlAnalyzer.analyzeUrl(url, userId);
+    // Standardize protocol normalization
+    let cleanUrl = url.trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = 'http://' + cleanUrl;
+    }
 
-    return res.status(200).json({
+    const userId = req.user ? req.user.id : null;
+
+    // 1. Check for recent fully-processed cached scan (within 1 hour) in PostgreSQL to save API quota
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const cachedScan = await prisma.urlScan.findFirst({
+      where: {
+        url: cleanUrl,
+        createdAt: {
+          gte: oneHourAgo
+        },
+        riskScore: {
+          not: null // Ensure cached scans represent completed analysis
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    if (cachedScan) {
+      console.log(`[scanController] Instant cache hit for: ${cleanUrl}`);
+      return res.status(200).json({
+        success: true,
+        status: 'completed',
+        scan: {
+          id: cachedScan.id,
+          url: cachedScan.url,
+          riskScore: cachedScan.riskScore,
+          confidence: cachedScan.confidence,
+          isPhishing: cachedScan.isPhishing,
+          threatCategory: cachedScan.threatCategory,
+          features: cachedScan.features,
+          explanations: cachedScan.explanations,
+          vtResult: cachedScan.vtResult,
+          gsbResult: cachedScan.gsbResult,
+          createdAt: cachedScan.createdAt,
+          cached: true
+        }
+      });
+    }
+
+    console.log(`[scanController] No cache found. Registering pending scan for: ${cleanUrl}`);
+
+    // 2. Insert a PENDING record in the database (Prisma leaves scores/features null automatically)
+    const newScan = await prisma.urlScan.create({
+      data: {
+        userId,
+        url: cleanUrl,
+      }
+    });
+
+    // 3. Enqueue scanning job in background Bull queue workers
+    await addScanJob(cleanUrl, userId, newScan.id);
+
+    // 4. Return rapid 202 Accepted to prevent locking gateway event loops
+    return res.status(202).json({
       success: true,
-      scan: result,
+      status: 'pending',
+      scanId: newScan.id,
+      message: 'Security inspection scheduled in background operations queue.'
     });
   } catch (error) {
-    console.error('[scanController] URL Scan error exception:', error.message);
-    return res.status(error.status || 500).json({
+    console.error('[scanController] Async URL Scan queue scheduling error:', error.message);
+    return res.status(500).json({
       success: false,
-      error: error.message || 'Threat scan failed inside the SentinelAI analyzer engine.',
+      error: 'Security Gateway failed to schedule threat inspection in active queues.',
     });
   }
 };
@@ -100,8 +159,9 @@ const getScanHistory = async (req, res, next) => {
       });
     }
 
+    const whereCondition = req.user.role === 'user' ? { userId: req.user.id } : {};
     const history = await prisma.urlScan.findMany({
-      where: { userId: req.user.id },
+      where: whereCondition,
       orderBy: { createdAt: 'desc' },
       take: 50, // Cap at latest 50 scans for performance
     });

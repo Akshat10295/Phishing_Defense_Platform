@@ -1,26 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, AlertTriangle, ShieldCheck, Cpu, RefreshCw, BarChart2, ShieldAlert } from 'lucide-react';
 import api from '../services/api';
+import useSocket from '../hooks/useSocket';
 
 const URLScanner = () => {
+  const socket = useSocket();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [pendingScanId, setPendingScanId] = useState(null);
 
-  const handleScan = async (e) => {
-    e.preventDefault();
-    if (!url) return;
-    setLoading(true);
-    setError('');
-    setResult(null);
+  // Maintain active scan ID ref for real-time WebSocket state synchrony
+  const pendingScanIdRef = useRef(null);
+  useEffect(() => {
+    pendingScanIdRef.current = pendingScanId;
+  }, [pendingScanId]);
 
-    try {
-      const response = await api.post('/scan/url', { url });
-      
-      if (response.data && response.data.success) {
-        const scanData = response.data.scan;
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleScanCompleted = (data) => {
+      console.log('[URLScanner] Live scan complete signal received:', data);
+      if (data.success && data.scan && data.scan.id === pendingScanIdRef.current) {
+        const scanData = data.scan;
         setResult({
           url: scanData.url,
           risk_score: scanData.riskScore,
@@ -32,13 +36,69 @@ const URLScanner = () => {
             description: item.label
           }))
         });
+        setLoading(false);
+        setPendingScanId(null);
+      }
+    };
+
+    const handleScanFailed = (data) => {
+      console.warn('[URLScanner] Live scan failed signal received:', data);
+      if (data.scanId === pendingScanIdRef.current) {
+        setError(data.error || 'Deep security evaluation timed out.');
+        setLoading(false);
+        setPendingScanId(null);
+      }
+    };
+
+    socket.on('scan:completed', handleScanCompleted);
+    socket.on('scan:failed', handleScanFailed);
+
+    return () => {
+      socket.off('scan:completed', handleScanCompleted);
+      socket.off('scan:failed', handleScanFailed);
+    };
+  }, [socket]);
+
+  const handleScan = async (e) => {
+    e.preventDefault();
+    if (!url) return;
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setPendingScanId(null);
+
+    try {
+      const response = await api.post('/scan/url', { url });
+      
+      if (response.data && response.data.success) {
+        const data = response.data;
+        if (data.status === 'completed') {
+          // Cache hit: slide in results immediately!
+          const scanData = data.scan;
+          setResult({
+            url: scanData.url,
+            risk_score: scanData.riskScore,
+            confidence: scanData.confidence,
+            threat_category: scanData.threatCategory,
+            explanations: scanData.explanations.map(item => ({
+              factor: item.factor,
+              impact: item.impact,
+              description: item.label
+            }))
+          });
+          setLoading(false);
+        } else {
+          // Enqueued in Bull Queue: Keep loader spinning and await websocket completion event!
+          setPendingScanId(data.scanId);
+          console.log(`[URLScanner] Scan enqueued (ID: ${data.scanId}). Awaiting WebSocket callback...`);
+        }
       } else {
         setError('Scanning failed to yield a security assessment.');
+        setLoading(false);
       }
     } catch (err) {
       console.error('Scan error:', err.message);
       setError(err.response?.data?.error || 'Connection to security gateway failed.');
-    } finally {
       setLoading(false);
     }
   };

@@ -1,13 +1,17 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./api/routes/auth.routes');
 const scanRoutes = require('./api/routes/scan.routes');
+const analyticsRoutes = require('./api/routes/analytics.routes');
 const prisma = require('./config/db');
+const socketService = require('./services/socket.service');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 // Security Middlewares
@@ -58,9 +62,10 @@ app.get('/api/v1/status', (req, res) => {
   });
 });
 
-// Auth and Scan Routes mapping
+// Auth, Scan and Analytics Routes mapping
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/scan', scanRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 
 // Database Health Check on startup
 prisma.$connect()
@@ -88,7 +93,13 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Initialize Secure WebSockets Gateway
+socketService.init(server);
+
+// Boot background Bull Queue worker threads
+require('./workers/scan.worker');
+
 // Listen on configured port
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`SentinelAI Gateway boot completed. Listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
 });

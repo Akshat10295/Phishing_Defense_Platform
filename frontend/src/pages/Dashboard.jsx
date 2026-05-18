@@ -1,45 +1,154 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Shield, AlertTriangle, CheckCircle, Database, TrendingUp, ShieldAlert, Users, Terminal } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Shield, 
+  AlertTriangle, 
+  CheckCircle, 
+  Database, 
+  TrendingUp, 
+  ShieldAlert, 
+  Users, 
+  Terminal,
+  RefreshCw
+} from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import useAppStore from '../store/useAppStore';
+import useSocket from '../hooks/useSocket';
+import api from '../services/api';
 
-const mockChartDataGlobal = [
-  { name: '08:00', attacks: 12 },
-  { name: '10:00', attacks: 19 },
-  { name: '12:00', attacks: 34 },
-  { name: '14:00', attacks: 21 },
-  { name: '16:00', attacks: 45 },
-  { name: '18:00', attacks: 15 },
-  { name: '20:00', attacks: 8 },
-];
-
-const mockChartDataPersonal = [
-  { name: 'Mon', attacks: 2 },
-  { name: 'Tue', attacks: 5 },
-  { name: 'Wed', attacks: 1 },
-  { name: 'Thu', attacks: 8 },
-  { name: 'Fri', attacks: 3 },
-  { name: 'Sat', attacks: 0 },
-  { name: 'Sun', attacks: 2 },
-];
-
-const mockRecentDetectionsGlobal = [
-  { id: 1, url: 'http://secure-update-paypal.confirm-account.net/login', category: 'Credential Harvesting', score: 0.94, time: '2 mins ago' },
-  { id: 2, url: 'https://amazn.support-portal-alert.com/refund', category: 'Financial Fraud', score: 0.88, time: '14 mins ago' },
-  { id: 3, url: 'http://microsoft-billing-verification.com/outlook', category: 'Lookalike Brand', score: 0.79, time: '32 mins ago' },
-  { id: 4, url: 'http://office365-upgrade.xyz/sharepoint', category: 'Credential Harvesting', score: 0.91, time: '1 hour ago' },
-];
-
-const mockRecentDetectionsPersonal = [
-  { id: 1, url: 'https://github.com/login', category: 'Verified Safe', score: 0.05, time: '10 mins ago' },
-  { id: 2, url: 'http://secure-verify-paypal.support-login.com/web', category: 'Credential Harvesting', score: 0.91, time: '2 hours ago' },
-  { id: 3, url: 'https://google.com', category: 'Verified Safe', score: 0.02, time: '1 day ago' },
-];
+// Map database returned icon strings to Lucide components
+const iconMap = {
+  Database: Database,
+  ShieldAlert: ShieldAlert,
+  Shield: Shield,
+  CheckCircle: CheckCircle,
+  Users: Users,
+  AlertTriangle: AlertTriangle
+};
 
 const Dashboard = () => {
   const { user } = useAppStore();
+  const socket = useSocket();
   const role = user?.role || 'user';
+
+  const [stats, setStats] = useState([]);
+  const [telemetry, setTelemetry] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // 1. Core Fetch routines
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/analytics/stats');
+      if (res.data.success) {
+        setStats(res.data.stats);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats:', err.message);
+    }
+  };
+
+  const fetchTelemetry = async () => {
+    try {
+      const res = await api.get('/analytics/telemetry');
+      if (res.data.success) {
+        setTelemetry(res.data.telemetry);
+      }
+    } catch (err) {
+      console.error('Failed to fetch telemetry:', err.message);
+    }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const res = await api.get('/scan/history');
+      if (res.data.success) {
+        // Map scan records to uniform threat logs format
+        const historyLogs = res.data.history.map(item => ({
+          id: item.id,
+          url: item.url,
+          category: item.threatCategory === 'none' || !item.threatCategory
+            ? (item.isPhishing ? 'Suspicious Phishing' : 'Verified Safe')
+            : item.threatCategory.replace(/_/g, ' '),
+          score: item.riskScore || 0,
+          time: formatTimeAgo(item.createdAt)
+        }));
+        setIncidents(historyLogs.slice(0, 5)); // Show latest 5 items initially
+      }
+    } catch (err) {
+      console.error('Failed to fetch history:', err.message);
+    }
+  };
+
+  // Helper to render relative timestamps
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  // 2. Lifecycle triggers: Initial Load & WebSocket event bindings
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        await Promise.all([
+          fetchStats(),
+          fetchTelemetry(),
+          fetchHistory()
+        ]);
+      } catch (err) {
+        setError('Failed to establish session metrics.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [role]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Secure operational thread listener for real-time threat broadcasts
+    socket.on('threat:alert', (threat) => {
+      console.log('[Dashboard] Real-Time Threat Event Intercepted:', threat);
+      setIncidents(prev => {
+        const formatted = {
+          id: threat.id,
+          url: threat.url,
+          category: threat.category,
+          score: threat.score,
+          time: 'Just now'
+        };
+        const updated = [formatted, ...prev];
+        if (updated.length > 5) updated.pop();
+        return updated;
+      });
+      // Increment top counters
+      fetchStats();
+    });
+
+    // Operational trend listener for telemetry updates
+    socket.on('telemetry:tick', (tick) => {
+      console.log('[Dashboard] Telemetry update stream:', tick);
+      fetchTelemetry();
+      fetchStats();
+    });
+
+    return () => {
+      socket.off('threat:alert');
+      socket.off('telemetry:tick');
+    };
+  }, [socket]);
 
   // Role-Specific Headers
   const getHeaderDetails = () => {
@@ -61,29 +170,17 @@ const Dashboard = () => {
     };
   };
 
-  // Role-Specific Stats Cards
-  const getStatsCards = () => {
-    if (role === 'user') {
-      return [
-        { title: 'My Scans Performed', value: '47', desc: 'Queries in current session', icon: Database, color: 'text-blue-400' },
-        { title: 'Phishing Intercepted', value: '4', desc: 'Securely blocked link requests', icon: ShieldAlert, color: 'text-cyber-threat' },
-        { title: 'Active ML Precision', value: '94.2%', desc: 'State-of-the-art accuracy', icon: Shield, color: 'text-cyber-glow' },
-        { title: 'Security Status', value: 'FULLY ARMORED', desc: 'Zero anomalies reported', icon: CheckCircle, color: 'text-cyber-glow' },
-      ];
-    }
-    
-    // Analyst and Admin stats (Global stats)
-    return [
-      { title: 'Total Handled Scans', value: '45,821', desc: '+12% from last 24h', icon: Database, color: 'text-blue-400' },
-      { title: 'Interceptions Enforced', value: '1,492', desc: '100% active block rate', icon: ShieldAlert, color: 'text-cyber-threat' },
-      { title: 'Active ML Accuracy', value: '94.2%', desc: 'Trained on 500k features', icon: Shield, color: 'text-cyber-glow' },
-      { title: role === 'admin' ? 'Managed Analysts' : 'Brand Clones Flagged', value: role === 'admin' ? '28 Active' : '312 Spoofs', desc: role === 'admin' ? 'Total provisioned users' : 'Zero-day detections', icon: role === 'admin' ? Users : AlertTriangle, color: 'text-cyber-warn' },
-    ];
-  };
-
   const header = getHeaderDetails();
-  const stats = getStatsCards();
   const isStandardUser = role === 'user';
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <RefreshCw className="w-10 h-10 animate-spin text-cyber-glow" />
+        <p className="text-sm font-mono text-cyber-muted">Connecting to security network telemetry...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -100,10 +197,16 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="p-4 bg-red-950/20 border border-red-900/40 rounded-lg text-cyber-threat text-sm font-mono">
+          ⚠ {error}
+        </div>
+      )}
+
       {/* Analytics stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {stats.map((stat, idx) => {
-          const Icon = stat.icon;
+          const Icon = iconMap[stat.icon] || Shield;
           return (
             <motion.div
               key={idx}
@@ -138,13 +241,13 @@ const Dashboard = () => {
             </div>
             <div className="p-2 bg-emerald-950/20 border border-emerald-900/35 rounded-lg flex items-center gap-1.5 text-xs text-cyber-glow font-mono">
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>{isStandardUser ? 'Usage: stable' : '+18.4% peak load'}</span>
+              <span>{isStandardUser ? 'Usage: active' : '+18.4% peak load'}</span>
             </div>
           </div>
 
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={isStandardUser ? mockChartDataPersonal : mockChartDataGlobal} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <AreaChart data={telemetry} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorAttacks" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -173,27 +276,43 @@ const Dashboard = () => {
           </div>
 
           <div className="space-y-4">
-            {(isStandardUser ? mockRecentDetectionsPersonal : mockRecentDetectionsGlobal).map((detection) => (
-              <div key={detection.id} className="p-3 bg-gray-950/40 border border-gray-900 rounded-lg flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className={`text-[10px] px-2 py-0.5 border rounded-full font-mono uppercase tracking-wider font-semibold ${
-                    detection.score >= 0.8 
-                      ? 'bg-red-950/30 border-red-900/30 text-cyber-threat' 
-                      : 'bg-emerald-950/30 border-emerald-900/30 text-cyber-glow'
-                  }`}>
-                    {detection.category}
-                  </span>
-                  <span className="text-[10px] text-cyber-muted font-mono">{detection.time}</span>
+            <AnimatePresence initial={false}>
+              {incidents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-cyber-muted font-mono text-xs border border-dashed border-gray-900 rounded-lg">
+                  <Terminal className="w-5 h-5 mb-2 text-cyber-muted" />
+                  <span>Awaiting threat metrics...</span>
                 </div>
-                <p className="text-xs font-mono truncate text-gray-300">{detection.url}</p>
-                <div className="flex justify-between items-center mt-1 border-t border-gray-900/60 pt-2 text-[10px] font-mono">
-                  <span className="text-cyber-muted">{detection.score >= 0.8 ? 'Anomaly Index:' : 'Safety Index:'}</span>
-                  <span className={detection.score >= 0.8 ? 'text-cyber-threat font-bold' : 'text-cyber-glow font-bold'}>
-                    {(detection.score * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-            ))}
+              ) : (
+                incidents.map((detection) => (
+                  <motion.div
+                    key={detection.id}
+                    initial={{ opacity: 0, x: -30, height: 0 }}
+                    animate={{ opacity: 1, x: 0, height: 'auto' }}
+                    exit={{ opacity: 0, x: 30, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="p-3 bg-gray-950/40 border border-gray-900 rounded-lg flex flex-col gap-2 relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className={`text-[10px] px-2 py-0.5 border rounded-full font-mono uppercase tracking-wider font-semibold ${
+                        detection.score >= 0.6 
+                          ? 'bg-red-950/30 border-red-900/30 text-cyber-threat' 
+                          : 'bg-emerald-950/30 border-emerald-900/30 text-cyber-glow'
+                      }`}>
+                        {detection.category}
+                      </span>
+                      <span className="text-[10px] text-cyber-muted font-mono">{detection.time}</span>
+                    </div>
+                    <p className="text-xs font-mono truncate text-gray-300 pr-1">{detection.url}</p>
+                    <div className="flex justify-between items-center mt-1 border-t border-gray-900/60 pt-2 text-[10px] font-mono">
+                      <span className="text-cyber-muted">{detection.score >= 0.6 ? 'Anomaly Index:' : 'Safety Index:'}</span>
+                      <span className={detection.score >= 0.6 ? 'text-cyber-threat font-bold' : 'text-cyber-glow font-bold'}>
+                        {(detection.score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
