@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .header {
+      display: flex;
+      justify-between: space-between;
+      align-items: center;
+      border-b: 1px solid #1f2937;
+      padding-bottom: 12px;
+      margin-bottom: 4px;
+    }
+    .logo {
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: -0.5px;
+      color: #f3f4f6;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge {
+      font-size: 8px;
+      background-color: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-panel {
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .status-ring {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 3px solid #10b981;
+      margin: 0 auto 12px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: #10b981;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+      transition: all 0.3s ease;
+    }
+    .status-ring.danger {
+      border-color: #dc2626;
+      color: #dc2626;
+      box-shadow: 0 0 15px rgba(220, 38, 38, 0.3);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    }
+    .status-title {
+      font-weight: 800;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .status-desc {
+      font-size: 10px;
+      color: #9ca3af;
+      word-break: break-all;
+      max-height: 32px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #6b7280;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      margin-top: 4px;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+    }
+    .input-group input {
+      flex: 1;
+      background: #0b0f19;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      color: #f3f4f6;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 11px;
+      box-sizing: border-box;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #10b981;
+    }
+    .btn {
+      background-color: #10b981;
+      border: none;
+      color: #0b0f19;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+    .btn-secondary {
+      background-color: #1f2937;
+      color: #9ca3af;
+      border: 1px solid #374151;
+    }
+    .btn-secondary:hover {
+      color: #f3f4f6;
+      border-color: #4b5563;
+    }
+    .footer {
+      display: flex;
+      justify-between: space-between;
+      align-items: center;
+      margin-top: 4px;
+      border-t: 1px solid #1f2937;
+      padding-top: 10px;
+      font-size: 9px;
+    }
+    .footer a {
+      color: #10b981;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    .result-panel {
+      background: rgba(17, 24, 39, 0.4);
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header" style="display: flex; justify-content: space-between; width: 100%;">
+      <div class="logo">🛡️ SentinelAI</div>
+      <div class="badge" id="engine-status">ACTIVE</div>
+    </div>
+
+    <!-- Active Tab Rating -->
+    <div class="status-panel">
+      <div class="status-ring" id="status-ring">✓</div>
+      <div class="status-title" id="status-title">ACTIVE CHANNEL SECURE</div>
+      <div class="status-desc" id="status-desc">Loading active tab audits...</div>
+    </div>
+
+    <!-- Manual Audit Port -->
+    <div>
+      <div class="section-title">Manual Threat Inspector</div>
+      <div class="input-group">
+        <input type="text" id="scan-input" placeholder="Type or paste suspicious link...">
+        <button class="btn" id="scan-btn">SCAN</button>
+      </div>
+    </div>
+
+    <!-- Live Scan Outcome -->
+    <div class="result-panel" id="result-panel">
+      <!-- Generated dynamically -->
+    </div>
+
+    <!-- Actions & Console Navigation Links -->
+    <div class="footer" style="display: flex; justify-content: space-between; width: 100%;">
+      <span style="color: #6b7280;">Security Portal v1.0.0</span>
+      <a href="http://localhost:5173" target="_blank">OPEN ANALYST CONSOLE</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
