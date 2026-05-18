@@ -9,6 +9,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from pipelines.feature_extraction import extract_features
 from explainability.shap_explainer import explain_url_features
 from training.train_url_model import train_model
+from pipelines.email_nlp import analyze_email_nlp
+from pipelines.visual_similarity import compare_visual_similarity
+from pipelines.qr_extractor import extract_qr_url
 
 app = Flask(__name__)
 
@@ -138,42 +141,37 @@ def calculate_heuristic_score(features: dict) -> float:
 
 @app.route('/predict/email', methods=['POST'])
 def predict_email():
-    """NLP email scan placeholder (Phase 4 scope)"""
+    """Run dynamic HuggingFace sequence classification on email bodies"""
     data = request.get_json() or {}
     body = data.get('body', '')
     
-    # Let's keep the placeholder highly functional
-    is_phishing = False
-    risk_score = 0.12
-    flags = []
-    
-    body_lower = body.lower()
-    if "suspend" in body_lower or "verify" in body_lower or "immediate" in body_lower or "act now" in body_lower:
-        is_phishing = True
-        risk_score = 0.82
-        flags.append("urgency_language")
+    if not body:
+        return jsonify({"success": False, "error": "Please provide the email body payload for analysis."}), 400
         
-    if "http" in body_lower or "login" in body_lower:
-        risk_score = min(1.0, risk_score + 0.15)
-        flags.append("suspicious_links")
-        
-    return jsonify({
-        "success": True,
-        "risk_score": float(round(risk_score, 4)),
-        "confidence": 0.89,
-        "flags": flags,
-        "is_phishing": is_phishing
-    }), 200
+    result = analyze_email_nlp(body)
+    return jsonify(result), 200
 
 @app.route('/predict/similarity', methods=['POST'])
 def predict_similarity():
-    """Visual page clone Siamese network placeholder (Phase 4 scope)"""
-    return jsonify({
-        "success": True,
-        "similarity_score": 0.05,
-        "is_clone": False,
-        "matched_brand": "None"
-    }), 200
+    """Siamese neural network evaluating webpage screenshot similarity (threshold < 0.15)"""
+    if 'image1' not in request.files or 'image2' not in request.files:
+        return jsonify({"success": False, "error": "Both screenshot image1 and image2 are required for similarity checking."}), 400
+        
+    img1_file = request.files['image1']
+    img2_file = request.files['image2']
+    
+    result = compare_visual_similarity(img1_file.read(), img2_file.read())
+    return jsonify(result), 200
+
+@app.route('/predict/qr', methods=['POST'])
+def predict_qr():
+    """Scans screenshot files for embedded QR codes and extracts URLs"""
+    if 'image' not in request.files:
+        return jsonify({"success": False, "error": "Image file containing QR code is required."}), 400
+        
+    img_file = request.files['image']
+    result = extract_qr_url(img_file.read())
+    return jsonify(result), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))

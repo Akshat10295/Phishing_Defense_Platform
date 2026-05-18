@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./api/routes/auth.routes');
 const scanRoutes = require('./api/routes/scan.routes');
 const analyticsRoutes = require('./api/routes/analytics.routes');
+const emailRoutes = require('./api/routes/email.routes');
 const prisma = require('./config/db');
 const socketService = require('./services/socket.service');
 
@@ -62,9 +63,10 @@ app.get('/api/v1/status', (req, res) => {
   });
 });
 
-// Auth, Scan and Analytics Routes mapping
+// Auth, Scan, Analytics and Email Routes mapping
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/scan', scanRoutes);
+app.use('/api/v1/scan', emailRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 
 // Database Health Check on startup

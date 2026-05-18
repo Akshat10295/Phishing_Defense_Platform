@@ -17,24 +17,33 @@ const EmailScanner = () => {
     setResult(null);
 
     try {
-      setTimeout(() => {
-        const isUrgent = emailText.toLowerCase().includes('suspend') || emailText.toLowerCase().includes('act now') || emailText.toLowerCase().includes('unauthorized');
-        
+      console.log('[EmailScanner] Submitting email payload to Node/Flask NLP gateway...');
+      const response = await api.post('/scan/email', {
+        body: emailText,
+        subject: 'Interactive Portal Audit',
+        sender: 'Analyst Security Workstation'
+      });
+      
+      if (response.data && response.data.success) {
+        const scanData = response.data.scan;
         setResult({
-          risk_score: isUrgent ? 0.91 : 0.08,
-          is_phishing: isUrgent,
-          confidence: 0.93,
-          flags: isUrgent ? ['urgency_language', 'suspicious_links', 'credential_harvesting'] : ['verified_safe'],
+          risk_score: scanData.risk_score,
+          is_phishing: scanData.is_phishing,
+          confidence: scanData.confidence,
+          flags: scanData.flags,
           nlp_analysis: {
-            urgency_score: isUrgent ? 0.88 : 0.05,
-            financial_hazard: isUrgent ? 0.74 : 0.02,
-            vocabulary_anomalies: isUrgent ? 0.81 : 0.10
+            urgency_score: scanData.nlp_analysis.urgency_score,
+            financial_hazard: scanData.nlp_analysis.financial_hazard,
+            vocabulary_anomalies: scanData.nlp_analysis.vocabulary_anomalies
           }
         });
-        setLoading(false);
-      }, 1500);
+      } else {
+        setError('Scanning failed to yield a security assessment.');
+      }
     } catch (err) {
-      setError('Connection to NLP gateway failed.');
+      console.error('NLP Scan error:', err.message);
+      setError(err.response?.data?.error || 'Connection to NLP security gateway failed.');
+    } finally {
       setLoading(false);
     }
   };
