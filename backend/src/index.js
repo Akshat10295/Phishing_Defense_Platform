@@ -27,7 +27,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('chrome-extension://')) {
         callback(null, true);
       } else {
         callback(new Error('CORS Policy violation: Request origin not allowed.'));
