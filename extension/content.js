@@ -68,6 +68,7 @@ const injectBlockOverlay = (riskScore) => {
     width: 100vw !important;
     height: 100vh !important;
     background-color: #020617 !important;
+    opacity: 1 !important;
     z-index: 2147483647 !important;
     font-family: 'Courier New', Courier, monospace !important;
     display: flex !important;
@@ -88,7 +89,6 @@ const injectBlockOverlay = (riskScore) => {
     padding: 40px !important;
     box-shadow: 0 0 60px rgba(239, 68, 68, 0.45) !important;
     text-align: center !important;
-    backdrop-filter: blur(16px) !important;
     box-sizing: border-box !important;
   `;
 
