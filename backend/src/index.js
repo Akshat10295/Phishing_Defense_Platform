@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./api/routes/auth.routes');
+const scanRoutes = require('./api/routes/scan.routes');
 const prisma = require('./config/db');
 
 const app = express();
@@ -57,8 +58,9 @@ app.get('/api/v1/status', (req, res) => {
   });
 });
 
-// Auth Routes mapping
+// Auth and Scan Routes mapping
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/scan', scanRoutes);
 
 // Database Health Check on startup
 prisma.$connect()
