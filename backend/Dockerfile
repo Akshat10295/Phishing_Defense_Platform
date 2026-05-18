@@ -3,6 +3,9 @@
 # ==========================================
 FROM node:18-alpine AS builder
 
+# Install OpenSSL and compatibility libraries so Prisma can compile the correct native binary
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -16,6 +19,9 @@ RUN npx prisma generate
 # Stage 2: Hardened Runtime Container
 # ==========================================
 FROM node:18-alpine
+
+# Install OpenSSL runtime libraries
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
