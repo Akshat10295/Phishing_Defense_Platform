@@ -18,8 +18,10 @@ const PORT = process.env.PORT || 5000;
 // Security Middlewares
 app.use(helmet());
 
-// CORS configuration - Allow localhost:3000 in dev
+// CORS configuration - Allow localhost:3000 in dev and Nginx in production
 const allowedOrigins = [
+  'http://localhost',
+  'http://localhost:80',
   'http://localhost:3000',
   'http://localhost:5173',
 ];
