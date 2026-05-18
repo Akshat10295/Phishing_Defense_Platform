@@ -28,7 +28,7 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY prisma ./prisma/
 COPY src ./src/
-COPY entrypoint.sh ./entrypoint.sh
+COPY ./entrypoint.sh ./entrypoint.sh
 
 # Harden filesystem permissions and switch to unprivileged user
 RUN chmod +x ./entrypoint.sh && \
