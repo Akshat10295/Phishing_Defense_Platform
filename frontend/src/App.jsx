@@ -4,6 +4,8 @@ import Layout from './components/ui/Layout';
 import Dashboard from './pages/Dashboard';
 import URLScanner from './pages/URLScanner';
 import EmailScanner from './pages/EmailScanner';
+import IncidentLogs from './pages/IncidentLogs';
+import AttackHeatmap from './pages/AttackHeatmap';
 import Login from './pages/Login';
 import useAppStore from './store/useAppStore';
 
@@ -44,8 +46,8 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="url-scanner" element={<URLScanner />} />
           <Route path="email-scanner" element={<EmailScanner />} />
-          <Route path="history" element={<PlaceholderScreen title="Incident Audit Logs" />} />
-          <Route path="heatmap" element={<PlaceholderScreen title="Global Attack Vector Heatmap" />} />
+          <Route path="history" element={<IncidentLogs />} />
+          <Route path="heatmap" element={<AttackHeatmap />} />
           <Route path="settings" element={<PlaceholderScreen title="SentinelAI Engine Configuration" />} />
         </Route>
 
