@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, AlertTriangle, ShieldCheck, Cpu, RefreshCw, BarChart2, ShieldAlert } from 'lucide-react';
+import { Globe, AlertTriangle, ShieldCheck, Cpu, RefreshCw, BarChart2, ShieldAlert, QrCode } from 'lucide-react';
 import api from '../services/api';
 import useSocket from '../hooks/useSocket';
 
@@ -8,6 +8,8 @@ const URLScanner = () => {
   const socket = useSocket();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrSuccessMsg, setQrSuccessMsg] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [pendingScanId, setPendingScanId] = useState(null);
@@ -60,12 +62,13 @@ const URLScanner = () => {
   }, [socket]);
 
   const handleScan = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!url) return;
     setLoading(true);
     setError('');
     setResult(null);
     setPendingScanId(null);
+    setQrSuccessMsg('');
 
     try {
       const response = await api.post('/scan/url', { url });
@@ -103,6 +106,86 @@ const URLScanner = () => {
     }
   };
 
+  const triggerScanWithUrl = async (scannedUrl) => {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    setPendingScanId(null);
+
+    try {
+      const response = await api.post('/scan/url', { url: scannedUrl });
+      if (response.data && response.data.success) {
+        const data = response.data;
+        if (data.status === 'completed') {
+          const scanData = data.scan;
+          setResult({
+            url: scanData.url,
+            risk_score: scanData.riskScore,
+            confidence: scanData.confidence,
+            threat_category: scanData.threatCategory,
+            explanations: scanData.explanations.map(item => ({
+              factor: item.factor,
+              impact: item.impact,
+              description: item.label
+            }))
+          });
+          setLoading(false);
+        } else {
+          setPendingScanId(data.scanId);
+        }
+      } else {
+        setError('Scanning failed to yield a security assessment.');
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Scan error:', err.message);
+      setError(err.response?.data?.error || 'Connection to security gateway failed.');
+      setLoading(false);
+    }
+  };
+
+  const handleQrUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setQrLoading(true);
+    setError('');
+    setQrSuccessMsg('');
+    setResult(null);
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result;
+      try {
+        const response = await api.post('/scan/qr', { image: base64String });
+        if (response.data && response.data.success) {
+          if (response.data.qr_found) {
+            const decodedUrl = response.data.payload;
+            setUrl(decodedUrl);
+            setQrSuccessMsg(`Decoded URL: ${decodedUrl}`);
+            
+            // Auto trigger scan
+            setTimeout(() => {
+              triggerScanWithUrl(decodedUrl);
+            }, 800);
+          } else {
+            setError(response.data.message || 'No active QR code detected in the scanned image.');
+          }
+        } else {
+          setError(response.data.error || 'Failed to scan QR code.');
+        }
+      } catch (err) {
+        console.error('QR upload scan error:', err);
+        setError(err.response?.data?.error || 'Connection to security gateway failed during QR analysis.');
+      } finally {
+        setQrLoading(false);
+        // Reset file input value so same file can be uploaded again if needed
+        e.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getScoreColor = (score) => {
     if (score >= 0.8) return 'text-cyber-threat border-red-900/35 bg-red-950/20';
     if (score >= 0.5) return 'text-cyber-warn border-amber-900/35 bg-amber-950/20';
@@ -114,40 +197,71 @@ const URLScanner = () => {
       {/* Header Info */}
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">AI Heuristic URL Inspector</h1>
-        <p className="text-sm text-cyber-muted mt-1">Submit web addresses to audit domain reputation, brand spoofing, and fake login DOM layouts.</p>
+        <p className="text-sm text-cyber-muted mt-1">Submit web addresses or upload QR codes to audit domain reputation, brand spoofing, and visual clones.</p>
       </div>
 
       {/* Query Bar */}
-      <form onSubmit={handleScan} className="glass-panel p-6 rounded-xl flex gap-4 items-center">
-        <div className="flex-1 relative">
-          <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Enter suspicious web address (e.g., http://paypal-secure-verify.com)..."
-            className="w-full bg-gray-950/60 border border-gray-800 rounded-lg py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-cyber-glow focus:ring-1 focus:ring-cyber-glow transition-all font-mono"
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-emerald-900/80 hover:bg-cyber-glow border border-emerald-800/40 text-cyber-text hover:text-cyber-dark py-3.5 px-6 rounded-lg font-bold text-sm transition-all duration-200 shadow-glow-emerald flex items-center gap-2 disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Analyzing Heuristics...</span>
-            </>
-          ) : (
-            <>
-              <Cpu className="w-4 h-4" />
-              <span>Inspect URL</span>
-            </>
-          )}
-        </button>
-      </form>
+      <div className="space-y-4">
+        <form onSubmit={handleScan} className="glass-panel p-6 rounded-xl flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex-1 w-full relative">
+            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-cyber-muted" />
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Enter suspicious web address (e.g., http://paypal-secure-verify.com)..."
+              className="w-full bg-gray-950/60 border border-gray-800 rounded-lg py-3.5 pl-12 pr-4 text-sm focus:outline-none focus:border-cyber-glow focus:ring-1 focus:ring-cyber-glow transition-all font-mono"
+              required
+            />
+          </div>
+          <div className="flex gap-3 w-full md:w-auto">
+            <button
+              type="submit"
+              disabled={loading || qrLoading}
+              className="flex-1 md:flex-none bg-emerald-900/80 hover:bg-cyber-glow border border-emerald-800/40 text-cyber-text hover:text-cyber-dark py-3.5 px-6 rounded-lg font-bold text-sm transition-all duration-200 shadow-glow-emerald flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Analyzing...</span>
+                </>
+              ) : (
+                <>
+                  <Cpu className="w-4 h-4" />
+                  <span>Inspect URL</span>
+                </>
+              )}
+            </button>
+            
+            <label className="flex-1 md:flex-none cursor-pointer bg-gray-900 hover:bg-gray-850 border border-gray-800 hover:border-gray-700 text-cyber-muted hover:text-cyber-text py-3.5 px-6 rounded-lg font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 select-none text-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleQrUpload}
+                disabled={loading || qrLoading}
+                className="hidden"
+              />
+              {qrLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Decoding...</span>
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-4 h-4" />
+                  <span>Scan QR Image</span>
+                </>
+              )}
+            </label>
+          </div>
+        </form>
+
+        {qrSuccessMsg && (
+          <div className="p-3 bg-emerald-950/20 border border-cyber-glow/30 rounded-lg text-cyber-glow text-xs font-mono">
+            ✔ {qrSuccessMsg}
+          </div>
+        )}
+      </div>
 
       {/* Errors */}
       {error && (

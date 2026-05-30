@@ -153,6 +153,41 @@ const getHeuristicExplanations = (features) => {
   return explanations;
 };
 
+/**
+ * Call Python ML service to decode QR code in image
+ * @param {string} base64Image The image containing a QR code as base64 string
+ * @returns {Promise<Object>} QR decoding results
+ */
+const predictQr = async (base64Image) => {
+  try {
+    const base64Data = base64Image.split(';base64,').pop();
+    const buffer = Buffer.from(base64Data, 'base64');
+    const blob = new Blob([buffer], { type: 'image/png' });
+
+    const formData = new FormData();
+    formData.append('image', blob, 'qrcode.png');
+
+    const response = await fetch(`${ML_SERVICE_URL}/predict/qr`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`ML Service QR responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('[mlBridge] predictQr error:', error.message);
+    return {
+      success: false,
+      error: `ML service connection failure: ${error.message}`,
+    };
+  }
+};
+
 module.exports = {
   predictUrl,
+  predictQr,
 };

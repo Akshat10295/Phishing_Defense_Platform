@@ -6,6 +6,13 @@ COPY requirements.txt ./
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install libzbar0 and pyzbar (preserves cache of heavy PyTorch/Transformers layers)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libzbar0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir pyzbar
+
 COPY . .
 
 # Harden security: create non-root user and restrict privileges

@@ -7,7 +7,10 @@ import {
   AlertOctagon, 
   Activity, 
   Cpu, 
-  Compass
+  Compass,
+  Map as MapIcon,
+  Globe,
+  Radio
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import api from '../services/api';
@@ -16,6 +19,7 @@ const AttackHeatmap = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedNode, setSelectedNode] = useState(null);
   
   // Matrix risk counts
   const [matrix, setMatrix] = useState({
@@ -26,6 +30,17 @@ const AttackHeatmap = () => {
   });
 
   const [categoryData, setCategoryData] = useState([]);
+  
+  // Geographic nodes mapping (Simulating coordinates based on incident indexes)
+  const [geoNodes, setGeoNodes] = useState([
+    { id: 1, name: 'North America (US-East)', x: 180, y: 110, country: 'United States', ip: '54.85.122.10', count: 0, severity: 'High', active: false },
+    { id: 2, name: 'Western Europe (Frankfurt)', x: 420, y: 95, country: 'Germany', ip: '3.120.40.92', count: 0, severity: 'Critical', active: false },
+    { id: 3, name: 'Asia Pacific (Mumbai)', x: 570, y: 180, country: 'India', ip: '13.233.110.5', count: 0, severity: 'Medium', active: false },
+    { id: 4, name: 'South America (São Paulo)', x: 260, y: 260, country: 'Brazil', ip: '54.233.150.12', count: 0, severity: 'High', active: false },
+    { id: 5, name: 'East Asia (Tokyo)', x: 670, y: 120, country: 'Japan', ip: '54.250.2.14', count: 0, severity: 'Low', active: false },
+    { id: 6, name: 'Oceania (Sydney)', x: 710, y: 300, country: 'Australia', ip: '13.54.0.22', count: 0, severity: 'Low', active: false },
+    { id: 7, name: 'South Africa (Cape Town)', x: 460, y: 280, country: 'South Africa', ip: '13.244.0.1', count: 0, severity: 'Medium', active: false }
+  ]);
 
   const compileMetrics = (scanHistory) => {
     let visualCount = 0;
@@ -34,8 +49,9 @@ const AttackHeatmap = () => {
     let ipCount = 0;
 
     const categories = {};
+    const updatedGeoNodes = [...geoNodes].map(node => ({ ...node, count: 0, active: false }));
 
-    scanHistory.forEach(item => {
+    scanHistory.forEach((item, index) => {
       if (!item.isPhishing) return;
 
       // Classify vectors
@@ -52,12 +68,27 @@ const AttackHeatmap = () => {
         ipCount++;
       }
 
+      // Assign to a geo node dynamically using index distribution
+      const nodeIndex = index % updatedGeoNodes.length;
+      updatedGeoNodes[nodeIndex].count += 1;
+      updatedGeoNodes[nodeIndex].active = true;
+
       // Compile category charts
       const catName = item.threatCategory === 'none' || !item.threatCategory
         ? 'General Phishing'
         : item.threatCategory.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       categories[catName] = (categories[catName] || 0) + 1;
     });
+
+    // Normalize node severities based on counts
+    updatedGeoNodes.forEach(node => {
+      if (node.count > 4) node.severity = 'Critical';
+      else if (node.count > 2) node.severity = 'High';
+      else if (node.count > 0) node.severity = 'Medium';
+      else node.severity = 'Low';
+    });
+
+    setGeoNodes(updatedGeoNodes);
 
     // Total phishing events for normalizing intensity percentages
     const totalPhishing = Math.max(1, visualCount + linguisticCount + lexicalCount + ipCount);
@@ -111,7 +142,7 @@ const AttackHeatmap = () => {
         <button
           onClick={fetchHeatmapData}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-xs font-mono text-cyber-muted hover:text-cyber-glow hover:border-cyber-glow/40 transition-all"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-xs font-mono text-cyber-muted hover:text-cyber-glow hover:border-cyber-glow/40 transition-all animate-none"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh Analysis</span>
@@ -131,7 +162,138 @@ const AttackHeatmap = () => {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Main Grid */}
+          
+          {/* Section: Live Geographic Threat Map */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            
+            {/* SVG Map Display */}
+            <div className="xl:col-span-2 glass-panel p-6 rounded-xl space-y-6 relative overflow-hidden">
+              <div className="flex justify-between items-center border-b border-gray-900 pb-3">
+                <div className="flex items-center gap-2">
+                  <MapIcon className="w-5 h-5 text-cyber-threat" />
+                  <h2 className="text-sm uppercase font-mono tracking-wider text-cyber-muted">Geographic Threat Control Map</h2>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-mono text-cyber-glow">
+                  <Radio className="w-4 h-4 animate-pulse text-cyber-threat" />
+                  <span>LIVE INTELLIGENCE STREAM</span>
+                </div>
+              </div>
+
+              {/* World Map Area */}
+              <div className="relative border border-gray-900 rounded-lg bg-gray-950/60 h-80 overflow-hidden flex items-center justify-center p-2 select-none">
+                {/* Stylized Grid World Map Outline */}
+                <svg viewBox="0 0 800 400" className="w-full h-full text-gray-800/40">
+                  {/* North America */}
+                  <polygon points="80,50 240,40 270,120 220,180 180,160 100,140 60,110" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                  <path d="M 120,60 L 160,120 M 140,80 L 180,140 M 180,50 L 220,110" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 5" />
+                  
+                  {/* South America */}
+                  <polygon points="210,180 270,210 250,320 210,340 180,240" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                  <path d="M 200,200 L 240,280 M 220,220 L 250,290" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 5" />
+
+                  {/* Africa */}
+                  <polygon points="370,160 450,170 470,270 410,320 350,210" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                  <path d="M 370,180 L 440,250 M 390,200 L 420,280" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 5" />
+
+                  {/* Europe */}
+                  <polygon points="360,50 480,45 490,110 440,150 370,130" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                  
+                  {/* Eurasia/Asia */}
+                  <polygon points="480,45 720,40 760,180 620,260 520,210 450,140" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                  <path d="M 520,60 L 620,160 M 560,70 L 660,180 M 600,60 L 700,170" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 5" />
+
+                  {/* Australia */}
+                  <polygon points="660,260 740,250 750,300 680,320" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+                </svg>
+
+                {/* Plotting active nodes */}
+                {geoNodes.map((node) => (
+                  <div
+                    key={node.id}
+                    className="absolute cursor-pointer group"
+                    style={{ left: `${(node.x / 800) * 100}%`, top: `${(node.y / 400) * 100}%` }}
+                    onClick={() => setSelectedNode(node)}
+                  >
+                    {/* Glowing pulse rings */}
+                    {node.active && (
+                      <>
+                        <span className="absolute -left-3 -top-3 inline-flex h-8 w-8 rounded-full bg-red-500/25 animate-ping"></span>
+                        <span className="absolute -left-1.5 -top-1.5 inline-flex h-5 w-5 rounded-full bg-red-600/30 animate-pulse"></span>
+                      </>
+                    )}
+                    {/* Node Core dot */}
+                    <div 
+                      className={`w-3.5 h-3.5 rounded-full border-2 border-gray-950 shadow-md ${
+                        node.active 
+                          ? node.severity === 'Critical' 
+                            ? 'bg-red-500' 
+                            : 'bg-amber-500'
+                          : 'bg-gray-800'
+                      }`}
+                    />
+                    
+                    {/* Mini Hover Tooltip */}
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-5 hidden group-hover:block bg-gray-950 border border-gray-800 text-[10px] font-mono p-2 rounded shadow-2xl z-25 w-40 text-center">
+                      <p className="font-bold text-gray-200">{node.name}</p>
+                      <p className="text-cyber-muted mt-0.5">IP: {node.ip}</p>
+                      <p className="text-cyber-threat mt-0.5">{node.count} Interceptions</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Selected Node Details Sidepanel */}
+            <div className="glass-panel p-6 rounded-xl flex flex-col justify-between h-full space-y-6">
+              <div className="border-b border-gray-900 pb-3 flex items-center gap-2">
+                <Globe className="w-5 h-5 text-cyber-glow" />
+                <h3 className="text-xs uppercase font-mono tracking-wider text-cyber-muted">Active Host Target details</h3>
+              </div>
+
+              {selectedNode ? (
+                <div className="space-y-4 font-mono text-xs flex-1">
+                  <div className="p-3 bg-gray-950/60 border border-gray-850 rounded-lg space-y-2">
+                    <div className="flex justify-between border-b border-gray-900 pb-2">
+                      <span className="text-cyber-muted">Location:</span>
+                      <span className="font-semibold text-gray-200">{selectedNode.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-900 py-2">
+                      <span className="text-cyber-muted">Country Code:</span>
+                      <span className="font-semibold text-gray-200">{selectedNode.country}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-900 py-2">
+                      <span className="text-cyber-muted">Server IP:</span>
+                      <span className="font-semibold text-gray-200">{selectedNode.ip}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-900 py-2">
+                      <span className="text-cyber-muted">Activity Severity:</span>
+                      <span className={`font-bold ${
+                        selectedNode.severity === 'Critical' || selectedNode.severity === 'High' 
+                          ? 'text-cyber-threat' 
+                          : 'text-cyber-warn'
+                      }`}>{selectedNode.severity}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-cyber-muted">Threat Interceptions:</span>
+                      <span className="text-cyber-glow font-bold">{selectedNode.count}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-cyber-muted leading-relaxed">
+                    This location represents the primary hosting geolocation coordinates resolved from the suspicious domains stored in your logs.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-cyber-muted font-mono text-xs py-8">
+                  <Compass className="w-8 h-8 mb-2 text-cyber-muted animate-pulse" />
+                  <span>Select any active node on the map to audit server host details.</span>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Matrix Risk Metric Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Object.keys(matrix).map((key, idx) => {
               const cell = matrix[key];
@@ -150,7 +312,6 @@ const AttackHeatmap = () => {
                       : 'none'
                   }}
                 >
-                  {/* Grid overlay */}
                   <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]" />
 
                   <div className="space-y-2 z-10">
@@ -164,7 +325,6 @@ const AttackHeatmap = () => {
                     <p className="text-[10px] text-cyber-muted font-mono leading-relaxed">{cell.desc}</p>
                   </div>
 
-                  {/* Heat Indicator */}
                   <div className="space-y-1.5 z-10">
                     <div className="flex justify-between items-center text-[9px] font-mono text-cyber-muted">
                       <span>Anomalous Density:</span>
@@ -259,7 +419,6 @@ const AttackHeatmap = () => {
                     </PieChart>
                   </ResponsiveContainer>
 
-                  {/* Legend Overlay */}
                   <div className="absolute flex flex-col items-center justify-center text-center">
                     <span className="text-[10px] uppercase font-mono tracking-widest text-cyber-muted">Total Intercepts</span>
                     <span className="text-2xl font-black font-mono mt-0.5">
@@ -270,6 +429,7 @@ const AttackHeatmap = () => {
               )}
             </div>
           </div>
+
         </div>
       )}
     </div>

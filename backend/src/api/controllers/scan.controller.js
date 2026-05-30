@@ -179,8 +179,37 @@ const getScanHistory = async (req, res, next) => {
   }
 };
 
+/**
+ * Scan QR code containing URL from uploaded base64 image data
+ * POST /api/v1/scan/qr
+ */
+const scanQr = async (req, res, next) => {
+  try {
+    const { image } = req.body;
+    
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid base64 encoded image string containing a QR code.',
+      });
+    }
+
+    const mlBridge = require('../../services/mlBridge.service');
+    const result = await mlBridge.predictQr(image);
+    
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[scanController] QR scan controller error:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to process QR code analysis on security gateway.',
+    });
+  }
+};
+
 module.exports = {
   scanUrl,
   getScanDetails,
   getScanHistory,
+  scanQr,
 };

@@ -14,6 +14,7 @@ router.use(protect);
 
 // Endpoint routes definitions
 router.post('/url', scanController.scanUrl);
+router.post('/qr', scanController.scanQr);
 router.get('/history', scanController.getScanHistory);
 router.get('/url/:id', scanController.getScanDetails);
 

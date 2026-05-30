@@ -46,6 +46,7 @@ services:
       - DATABASE_URL=postgresql://sentinel:${DB_PASSWORD:-sentinelpass}@postgres:5432/sentinelai?schema=public
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redispass}@redis:6379
       - JWT_SECRET=${JWT_SECRET:-jwtsecret12345}
+      - ML_SERVICE_URL=http://ml-service:8000
       - NODE_ENV=production
     depends_on:
       postgres:
